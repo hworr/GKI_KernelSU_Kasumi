@@ -67,6 +67,20 @@ runs:
         # Change Makefile from obj-m to obj-$(CONFIG_KASUMI)
         sed -i 's/obj-m += kasumi_lkm.o/obj-$(CONFIG_KASUMI) += kasumi_lkm.o/' "$DRIVER_DIR/kasumi/Makefile"
 
+        # Add kasumi_lkm.ko to BUILD.bazel module_outs so Kleaf copies it to output
+        if [ "$DRIVER_DIR" = "drivers" ]; then
+          BUILD_BAZEL="BUILD.bazel"
+        else
+          BUILD_BAZEL="${DRIVER_DIR%/drivers}/BUILD.bazel"
+        fi
+        if [ -f "$BUILD_BAZEL" ]; then
+          if grep -q "module_outs" "$BUILD_BAZEL"; then
+            sed -i '/module_outs = \[/a\        "drivers\/kasumi\/kasumi_lkm.ko",' "$BUILD_BAZEL"
+          else
+            sed -i '/name = "kernel_aarch64",/a\    module_outs = [\n        "drivers\/kasumi\/kasumi_lkm.ko",\n    ],' "$BUILD_BAZEL"
+          fi
+        fi
+
     - name: Enable Kernel Configs
       uses: ./.github/actions/set-kernel-config
       with:
