@@ -46,6 +46,10 @@ runs:
         mkdir -p "$DRIVER_DIR/kasumi"
         cp -r Kasumi/src/. "$DRIVER_DIR/kasumi/"
 
+        # Create symlink for kasumi_bootstrap.h so kasumi_main.c can find it
+        # at the top level via #include "kasumi_bootstrap.h"
+        ln -sf core/kasumi_bootstrap.h "$DRIVER_DIR/kasumi/kasumi_bootstrap.h"
+
         # Create Kconfig for drivers/kasumi
         cat << 'EOF' > "$DRIVER_DIR/kasumi/Kconfig"
         config KASUMI
