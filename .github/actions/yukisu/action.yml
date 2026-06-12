@@ -9,6 +9,10 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Ensure kernel directory exists
+      shell: bash
+      run: mkdir -p "${{ github.workspace }}/kernel"
+
     - name: Download YukiSU
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
