@@ -87,8 +87,7 @@ runs:
 
           new_content = None
 
-          # Strategy 1: common_kernel(name = "kernel_aarch64", module_implicit_outs = ...)
-          # Used in android16-6.12. module_implicit_outs may be a literal list or function expression.
+          # Strategy 1: common_kernel(name = "kernel_aarch64", ...)
           ck_match = re.search(r'common_kernel\s*\(\s*name\s*=\s*["\']kernel_aarch64["\']', content)
           if ck_match:
               print(f"[yukisu-patch] Found common_kernel(name = kernel_aarch64) at offset {ck_match.start()}")
@@ -98,17 +97,17 @@ runs:
                   block_content = content[ck_match.start():block_end + 1]
                   print(f"[yukisu-patch] common_kernel block ({len(block_content)} chars)")
 
-                  mio_match = re.search(r'module_implicit_outs\s*=\s*', block_content)
-                  if mio_match:
-                      print(f"[yukisu-patch] module_implicit_outs already exists, skipping")
-                      sys.exit(0)
+                  mo_match = re.search(r'module_outs\s*=\s*\[', block_content)
+                  if mo_match:
+                      insert_at = ck_match.start() + mo_match.end()
+                      new_content = content[:insert_at] + '\n        "' + entry + '",' + content[insert_at:]
+                      print(f"[yukisu-patch] Inserted into existing module_outs in common_kernel")
                   else:
-                      mio_block = '\n    module_implicit_outs = [\n        "' + entry + '",\n    ],\n'
-                      new_content = content[:block_end] + mio_block + content[block_end:]
-                      print(f"[yukisu-patch] Added module_implicit_outs attribute to common_kernel")
+                      mo_block = '\n    module_outs = [\n        "' + entry + '",\n    ],\n'
+                      new_content = content[:block_end] + mo_block + content[block_end:]
+                      print(f"[yukisu-patch] Added module_outs attribute to common_kernel")
 
           # Strategy 2: define_common_kernels(target_configs = {"kernel_aarch64": {...}, ...})
-          # Used in android15-6.6. kernel_aarch64 is a dict key in target_configs.
           if new_content is None:
               dcm_match = re.search(r'define_common_kernels\s*\(', content)
               if dcm_match:
@@ -125,19 +124,15 @@ runs:
                       ka_block = content[ka_dict_open:ka_dict_end + 1]
                       print(f"[yukisu-patch] kernel_aarch64 dict block: {ka_block[:400]}")
 
-                      mio_match = re.search(r'"module_implicit_outs"\s*:', ka_block)
                       mo_match = re.search(r'"module_outs"\s*:\s*\[', ka_block)
-                      if mio_match:
-                          print(f"[yukisu-patch] module_implicit_outs already exists in define_common_kernels, skipping")
-                          sys.exit(0)
-                      elif mo_match:
+                      if mo_match:
                           insert_at = ka_dict_open + mo_match.end()
                           new_content = content[:insert_at] + '\n            "' + entry + '",' + content[insert_at:]
                           print(f"[yukisu-patch] Inserted into existing module_outs in define_common_kernels dict")
                       else:
-                          mio_entry = '\n        "module_implicit_outs": [\n            "' + entry + '",\n        ],'
-                          new_content = content[:ka_dict_end] + mio_entry + content[ka_dict_end:]
-                          print(f"[yukisu-patch] Added module_implicit_outs to kernel_aarch64 dict in define_common_kernels")
+                          mo_entry = '\n        "module_outs": [\n            "' + entry + '",\n        ],'
+                          new_content = content[:ka_dict_end] + mo_entry + content[ka_dict_end:]
+                          print(f"[yukisu-patch] Added module_outs to kernel_aarch64 dict in define_common_kernels")
                   else:
                       print(f"[yukisu-patch] kernel_aarch64 key not found in define_common_kernels block")
 
