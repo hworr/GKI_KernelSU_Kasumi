@@ -63,17 +63,17 @@ runs:
           if entry in content:
               print("Already present, skipping")
               sys.exit(0)
-          idx = content.find('name = "kernel_aarch64"')
-          if idx < 0:
-              idx = content.find("name = 'kernel_aarch64'")
-          if idx >= 0:
+          target_match = re.search(r'name\s*=\s*["\']kernel_aarch64["\']', content)
+          if target_match:
               print("Found kernel_aarch64 target")
-              line_start = content.rfind('\n', 0, idx) + 1
-              build_start = content.rfind('kernel_build(', 0, line_start)
-              if build_start >= 0:
-                  # Find matching closing ) by tracking depth
-                  depth = 0
+              idx = target_match.start()
+              block_starts = [m.start() for m in re.finditer(r'^\s*kernel_build\s*\(', content, re.M) if m.start() < idx]
+              if not block_starts:
+                  block_starts = [m.start() for m in re.finditer(r'^\s*\w+\s*\(', content, re.M) if m.start() < idx]
+              if block_starts:
+                  build_start = block_starts[-1]
                   paren_start = content.index('(', build_start)
+                  depth = 0
                   block_end = -1
                   for j in range(paren_start, len(content)):
                       if content[j] == '(':
@@ -85,8 +85,10 @@ runs:
                               break
                   if block_end >= 0:
                       block_content = content[build_start:block_end+1]
-                      if 'module_outs' in block_content:
-                          new_block_content = block_content.replace('module_outs = [', 'module_outs = [\n        "' + entry + '",', 1)
+                      match_outs = re.search(r'module_outs\s*=\s*\[', block_content)
+                      if match_outs:
+                          end_idx = match_outs.end()
+                          new_block_content = block_content[:end_idx] + '\n        "' + entry + '",' + block_content[end_idx:]
                           content = content[:build_start] + new_block_content + content[block_end+1:]
                           with open(path, 'w') as f:
                               f.write(content)
