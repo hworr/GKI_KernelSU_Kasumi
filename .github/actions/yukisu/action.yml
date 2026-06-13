@@ -72,9 +72,9 @@ runs:
               sys.exit(0)
 
           def find_block_end(text, start):
-              """Find the matching closing paren/bracket for the open paren/bracket at or after start."""
+              """Find the matching closing paren/bracket/brace for the opener at start."""
               open_ch = text[start]
-              close_ch = ')' if open_ch == '(' else ']'
+              close_ch = ')' if open_ch == '(' else '}' if open_ch == '{' else ']'
               depth = 0
               for i in range(start, len(text)):
                   if text[i] == open_ch:
