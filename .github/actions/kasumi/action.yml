@@ -73,8 +73,8 @@ runs:
 
           new_content = None
 
-          # Strategy 1: common_kernel(name = "kernel_aarch64", module_implicit_outs = [...])
-          # Used in android16-6.12. Direct kernel-like call with module_implicit_outs attribute.
+          # Strategy 1: common_kernel(name = "kernel_aarch64", module_implicit_outs = ...)
+          # Used in android16-6.12. module_implicit_outs may be a literal list or function expression.
           ck_match = re.search(r'common_kernel\s*\(\s*name\s*=\s*["\']kernel_aarch64["\']', content)
           if ck_match:
               print(f"[kasumi-patch] Found common_kernel(name = kernel_aarch64) at offset {ck_match.start()}")
@@ -84,12 +84,13 @@ runs:
                   block_content = content[ck_match.start():block_end + 1]
                   print(f"[kasumi-patch] common_kernel block ({len(block_content)} chars)")
 
-                  # Check for existing module_implicit_outs
-                  mio_match = re.search(r'module_implicit_outs\s*=\s*\[', block_content)
+                  # Check for existing module_implicit_outs (may be literal list or function expression)
+                  mio_match = re.search(r'module_implicit_outs\s*=\s*', block_content)
                   if mio_match:
-                      insert_at = ck_match.start() + mio_match.end()
-                      new_content = content[:insert_at] + '\n        "' + entry + '",' + content[insert_at:]
-                      print(f"[kasumi-patch] Inserted into existing module_implicit_outs in common_kernel")
+                      # Already has module_implicit_outs - nothing to do, module should be built automatically
+                      # by Kleaf from kernel config if CONFIG_KASUMI=m
+                      print(f"[kasumi-patch] module_implicit_outs already exists, skipping manual addition")
+                      sys.exit(0)
                   else:
                       # Add module_implicit_outs attribute
                       mio_block = '\n    module_implicit_outs = [\n        "' + entry + '",\n    ],\n'
@@ -114,23 +115,20 @@ runs:
                       ka_block = content[ka_dict_open:ka_dict_end + 1]
                       print(f"[kasumi-patch] kernel_aarch64 dict block: {ka_block[:400]}")
 
-                      # define_common_kernels uses module_implicit_outs; legacy may use module_outs
-                      mio_match = re.search(r'"module_implicit_outs"\s*:\s*\[', ka_block)
+                      # define_common_kernels uses module_implicit_outs (may be function expression)
+                      mio_match = re.search(r'"module_implicit_outs"\s*:', ka_block)
+                      mo_match = re.search(r'"module_outs"\s*:\s*\[', ka_block)
                       if mio_match:
-                          insert_at = ka_dict_open + mio_match.end()
+                          print(f"[kasumi-patch] module_implicit_outs already exists in define_common_kernels, skipping")
+                          sys.exit(0)
+                      elif mo_match:
+                          insert_at = ka_dict_open + mo_match.end()
                           new_content = content[:insert_at] + '\n            "' + entry + '",' + content[insert_at:]
-                          print(f"[kasumi-patch] Inserted into existing module_implicit_outs in define_common_kernels dict")
+                          print(f"[kasumi-patch] Inserted into existing module_outs in define_common_kernels dict")
                       else:
-                          mo_match = re.search(r'"module_outs"\s*:\s*\[', ka_block)
-                          if mo_match:
-                              insert_at = ka_dict_open + mo_match.end()
-                              new_content = content[:insert_at] + '\n            "' + entry + '",' + content[insert_at:]
-                              print(f"[kasumi-patch] Inserted into existing module_outs in define_common_kernels dict")
-                          else:
-                              # Add module_implicit_outs entry (correct for define_common_kernels)
-                              mio_entry = '\n        "module_implicit_outs": [\n            "' + entry + '",\n        ],'
-                              new_content = content[:ka_dict_end] + mio_entry + content[ka_dict_end:]
-                              print(f"[kasumi-patch] Added module_implicit_outs to kernel_aarch64 dict in define_common_kernels")
+                          mio_entry = '\n        "module_implicit_outs": [\n            "' + entry + '",\n        ],'
+                          new_content = content[:ka_dict_end] + mio_entry + content[ka_dict_end:]
+                          print(f"[kasumi-patch] Added module_implicit_outs to kernel_aarch64 dict in define_common_kernels")
                   else:
                       print(f"[kasumi-patch] kernel_aarch64 key not found in define_common_kernels block")
 

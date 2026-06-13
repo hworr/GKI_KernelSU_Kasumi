@@ -87,8 +87,8 @@ runs:
 
           new_content = None
 
-          # Strategy 1: common_kernel(name = "kernel_aarch64", module_implicit_outs = [...])
-          # Used in android16-6.12. Direct kernel-like call with module_implicit_outs attribute.
+          # Strategy 1: common_kernel(name = "kernel_aarch64", module_implicit_outs = ...)
+          # Used in android16-6.12. module_implicit_outs may be a literal list or function expression.
           ck_match = re.search(r'common_kernel\s*\(\s*name\s*=\s*["\']kernel_aarch64["\']', content)
           if ck_match:
               print(f"[yukisu-patch] Found common_kernel(name = kernel_aarch64) at offset {ck_match.start()}")
@@ -98,11 +98,10 @@ runs:
                   block_content = content[ck_match.start():block_end + 1]
                   print(f"[yukisu-patch] common_kernel block ({len(block_content)} chars)")
 
-                  mio_match = re.search(r'module_implicit_outs\s*=\s*\[', block_content)
+                  mio_match = re.search(r'module_implicit_outs\s*=\s*', block_content)
                   if mio_match:
-                      insert_at = ck_match.start() + mio_match.end()
-                      new_content = content[:insert_at] + '\n        "' + entry + '",' + content[insert_at:]
-                      print(f"[yukisu-patch] Inserted into existing module_implicit_outs in common_kernel")
+                      print(f"[yukisu-patch] module_implicit_outs already exists, skipping")
+                      sys.exit(0)
                   else:
                       mio_block = '\n    module_implicit_outs = [\n        "' + entry + '",\n    ],\n'
                       new_content = content[:block_end] + mio_block + content[block_end:]
@@ -121,27 +120,24 @@ runs:
                   ka_key = re.search(r'["\']kernel_aarch64["\']\s*:\s*\{', dcm_block)
                   if ka_key:
                       print(f"[yukisu-patch] Found kernel_aarch64 dict entry at offset {ka_key.start()}")
-                      ka_dict_open = dcm_match.start() + ka_key.end() - 1  # position of '{'
+                      ka_dict_open = dcm_match.start() + ka_key.end() - 1
                       ka_dict_end = find_block_end(content, ka_dict_open)
                       ka_block = content[ka_dict_open:ka_dict_end + 1]
                       print(f"[yukisu-patch] kernel_aarch64 dict block: {ka_block[:400]}")
 
-                      # define_common_kernels uses module_implicit_outs; legacy may use module_outs
-                      mio_match = re.search(r'"module_implicit_outs"\s*:\s*\[', ka_block)
+                      mio_match = re.search(r'"module_implicit_outs"\s*:', ka_block)
+                      mo_match = re.search(r'"module_outs"\s*:\s*\[', ka_block)
                       if mio_match:
-                          insert_at = ka_dict_open + mio_match.end()
+                          print(f"[yukisu-patch] module_implicit_outs already exists in define_common_kernels, skipping")
+                          sys.exit(0)
+                      elif mo_match:
+                          insert_at = ka_dict_open + mo_match.end()
                           new_content = content[:insert_at] + '\n            "' + entry + '",' + content[insert_at:]
-                          print(f"[yukisu-patch] Inserted into existing module_implicit_outs in define_common_kernels dict")
+                          print(f"[yukisu-patch] Inserted into existing module_outs in define_common_kernels dict")
                       else:
-                          mo_match = re.search(r'"module_outs"\s*:\s*\[', ka_block)
-                          if mo_match:
-                              insert_at = ka_dict_open + mo_match.end()
-                              new_content = content[:insert_at] + '\n            "' + entry + '",' + content[insert_at:]
-                              print(f"[yukisu-patch] Inserted into existing module_outs in define_common_kernels dict")
-                          else:
-                              mio_entry = '\n        "module_implicit_outs": [\n            "' + entry + '",\n        ],'
-                              new_content = content[:ka_dict_end] + mio_entry + content[ka_dict_end:]
-                              print(f"[yukisu-patch] Added module_implicit_outs to kernel_aarch64 dict in define_common_kernels")
+                          mio_entry = '\n        "module_implicit_outs": [\n            "' + entry + '",\n        ],'
+                          new_content = content[:ka_dict_end] + mio_entry + content[ka_dict_end:]
+                          print(f"[yukisu-patch] Added module_implicit_outs to kernel_aarch64 dict in define_common_kernels")
                   else:
                       print(f"[yukisu-patch] kernel_aarch64 key not found in define_common_kernels block")
 
