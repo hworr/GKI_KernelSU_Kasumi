@@ -43,7 +43,8 @@ runs:
         # Setup cache directories
         export CCACHE_DIR="/home/runner/.ccache"
         echo "CCACHE_DIR=$CCACHE_DIR" >> $GITHUB_ENV
-        mkdir -p "$CCACHE_DIR"
+        sudo mkdir -p "$CCACHE_DIR"
+        sudo chown -R $USER:$USER "$CCACHE_DIR"
 
         export CCACHE_MAXSIZE="12G"
         echo CCACHE_MAXSIZE="$CCACHE_MAXSIZE" >> $GITHUB_ENV
@@ -98,7 +99,8 @@ runs:
       run: |
         set -euo pipefail
         export BAZEL_CACHE_DIR="/home/runner/.cache/bazel"
-        mkdir -p "$BAZEL_CACHE_DIR"
+        sudo mkdir -p "$BAZEL_CACHE_DIR"
+        sudo chown -R $USER:$USER "$BAZEL_CACHE_DIR"
         
         # Set bazel disk cache size limit to 8GB
         #export BAZEL_DISK_CACHE_SIZE="8589934592"
@@ -114,7 +116,8 @@ runs:
         set -euo pipefail
         export LDCACHE_DIR="/home/runner/.ld_cache"
         echo "LDCACHE_DIR=$LDCACHE_DIR" >> $GITHUB_ENV
-        mkdir -p "$LDCACHE_DIR"
+        sudo mkdir -p "$LDCACHE_DIR"
+        sudo chown -R $USER:$USER "$LDCACHE_DIR"
           
         # Create LD wrapper for thin-LTO caching
         cat > "${{ github.workspace }}/kernel/common/ld-wrapper" << 'EOF'
